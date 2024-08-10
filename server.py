@@ -6,6 +6,9 @@ import os
 import logging
 import traceback
 
+# Replace this with your proxy details
+PROXY_URL = "https://spm4cfexxu:B9s~1xpmnWuaTA1rc9@gate.visitxiangtan.com:10001"
+
 class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -35,7 +38,11 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+            # Fetch the transcript using the proxy
+            transcript = YouTubeTranscriptApi.get_transcript(
+                video_id,
+                proxies={"https": PROXY_URL}
+            )
             response = json.dumps(transcript)
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
