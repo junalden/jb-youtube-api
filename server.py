@@ -1,9 +1,10 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs
 import os
 import logging
+import traceback
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -41,11 +42,20 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(response.encode('utf-8'))
         except Exception as e:
+            logging.error(f"An error occurred: {e}")
+            logging.error(traceback.format_exc())
             error_response = json.dumps({"error": str(e)})
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(error_response.encode('utf-8'))
+
+    def send_response_with_cors(self, status_code, content_type, body):
+        self.send_response(status_code)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-type', content_type)
+        self.end_headers()
+        self.wfile.write(body)
 
 def run(server_class=HTTPServer, handler_class=RequestHandler):
     port = int(os.environ.get('PORT', 8020))
@@ -57,4 +67,3 @@ def run(server_class=HTTPServer, handler_class=RequestHandler):
 
 if __name__ == '__main__':
     run()
-
