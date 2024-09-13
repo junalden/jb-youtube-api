@@ -7,7 +7,7 @@ import logging
 import traceback
 
 # Updated proxy details
-PROXY_URL = "http://sp5gfg7b2l:Y7~folCwj4zlGfVs48@gate.visitxiangtan.com:10001"
+PROXY_URL = "https://sp9232f6hp:kTy78k+lDRd89ukokP@ph.visitxiangtan.com:40001"
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
