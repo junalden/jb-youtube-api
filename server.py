@@ -1,17 +1,42 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import GenericProxyConfig
 from urllib.parse import parse_qs
 import os
 import logging
 import traceback
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Load proxy details from environment variables
 PROXY_USERNAME = os.environ.get('PROXY_USERNAME', '')
 PROXY_PASSWORD = os.environ.get('PROXY_PASSWORD', '')
 PROXY_HOST = os.environ.get('PROXY_HOST', '')  # e.g., resi.proxy-cheap.com:31112 or ph.smartproxy.com:40003
-PROXY_URL = f"https://{PROXY_USERNAME}:{PROXY_PASSWORD}@{PROXY_HOST}" if PROXY_USERNAME and PROXY_PASSWORD and PROXY_HOST else None
+
+# Build proxy URL with http:// protocol (proxy itself uses HTTP, even for HTTPS destinations)
+PROXY_URL = f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@{PROXY_HOST}" if PROXY_USERNAME and PROXY_PASSWORD and PROXY_HOST else None
+
+# Initialize YouTube Transcript API with proxy config
+if PROXY_URL:
+    try:
+        # Create proxy config with both HTTP and HTTPS
+        proxy_config = GenericProxyConfig(
+            http_url=PROXY_URL,
+            https_url=PROXY_URL
+        )
+        ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
+        logging.info(f"YouTube Transcript API initialized with proxy: {PROXY_HOST}")
+    except Exception as e:
+        logging.error(f"Failed to initialize proxy config: {e}")
+        logging.warning("Falling back to no proxy initialization")
+        ytt_api = YouTubeTranscriptApi()
+else:
+    ytt_api = YouTubeTranscriptApi()
+    logging.info("YouTube Transcript API initialized without proxy")
 
 # Load OpenAI API key
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
@@ -75,16 +100,18 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Fetch the transcript using proxy if configured, otherwise direct
-            if PROXY_URL:
-                logging.info(f"Fetching transcript for {video_id} using proxy")
-                transcript = YouTubeTranscriptApi.get_transcript(
-                    video_id,
-                    proxies={"https": PROXY_URL}
-                )
-            else:
-                logging.info(f"Fetching transcript for {video_id} without proxy")
-                transcript = YouTubeTranscriptApi.get_transcript(video_id)
+            # Fetch the transcript - will try auto-generated if manual not available
+            logging.info(f"Fetching transcript for {video_id}" + (" using proxy" if PROXY_URL else " without proxy"))
+            
+            # Use the new API - fetch() method with language preferences
+            # This will automatically try both manual and auto-generated transcripts
+            fetched_transcript = ytt_api.fetch(
+                video_id,
+                languages=['en', 'en-US', 'en-GB']
+            )
+            
+            # Convert to raw data format (list of dicts)
+            transcript = fetched_transcript.to_raw_data()
             
             response = json.dumps(transcript)
             self.send_response_with_cors(200, 'application/json', response.encode('utf-8'))
@@ -98,6 +125,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 error_message = "Transcript not available for this video. It may be disabled or the video doesn't exist."
             elif "Subtitles are disabled" in error_message:
                 error_message = "Subtitles are disabled for this video."
+            elif "ProxyError" in str(type(e)) or "proxy" in error_message.lower():
+                error_message = "Proxy connection failed. Please check proxy configuration and try again."
             
             error_response = json.dumps({"error": error_message})
             self.send_response_with_cors(500, 'application/json', error_response.encode('utf-8'))
