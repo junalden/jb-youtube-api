@@ -55,6 +55,14 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
+    def do_HEAD(self):
+        """Handle HEAD requests for health checks (UptimeRobot, etc.)"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-type', 'text/plain')
+        self.send_header('Content-Length', '2')
+        self.end_headers()
+
     def do_GET(self):
         self.send_response_with_cors(200, 'text/html', self._read_file('index.html'))
 
