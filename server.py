@@ -148,6 +148,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             logging.info("Generating AI summary using OpenAI API")
             
+            # Truncate text if too long (rough estimate: 1 token ≈ 4 chars)
+            # Max tokens for gpt-3.5-turbo: 16385, reserve ~1500 for response and system prompt
+            max_chars = 14000 * 4  # ~14000 tokens for input
+            if len(text) > max_chars:
+                logging.warning(f"Transcript too long ({len(text)} chars), truncating to {max_chars} chars")
+                text = text[:max_chars] + "\n\n[Transcript truncated due to length]"
+            
             # Call OpenAI API
             headers = {
                 "Content-Type": "application/json",
